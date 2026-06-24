@@ -10,7 +10,7 @@ const DATA_FILE = path.join(__dirname, 'data', 'abbonamenti.json');
 
 // === CONFIGURAZIONE LOGIN ===
 // Password di default: password123
-const ADMIN_HASH = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
+const ADMIN_HASH = '$2a$12$9juPGVLmbnCbi7zQpIidDuGM6CUfl79al0lkyoJ74FE9hh7CzAkUC/.og/at2.uheWG/igi';
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));

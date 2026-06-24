@@ -72,6 +72,12 @@
   .save-indicator { position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; opacity: 0; transition: opacity 0.3s; z-index: 2000; }
   .save-indicator.show { opacity: 1; }
   .user-badge { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+  .filters-bar { margin-bottom: 20px; }
+  .filter-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+  .filter-row select { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.85rem; background: white; cursor: pointer; min-width: 160px; }
+  .filter-row select:focus { outline: none; border-color: #3b82f6; }
+  .results-count { font-size: 0.85rem; color: #64748b; margin-top: 8px; font-weight: 500; }
+  .search-box { width: 100%; padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; margin-bottom: 10px; }
   @media (max-width: 768px) {
     .container { padding: 10px; }
     th, td { padding: 8px 6px; font-size: 0.75rem; }
@@ -105,7 +111,46 @@
   </div>
 
   <div class="panel active" id="panel-list">
-    <input type="text" class="search-box" id="searchInput" placeholder="Cerca..." oninput="renderList()">
+    <div class="filters-bar">
+  <input type="text" class="search-box" id="searchInput" placeholder="🔍 Cerca per nome, servizio, contatto..." oninput="renderList()">
+  <div class="filter-row">
+    <select id="filterStato" onchange="renderList()">
+      <option value="">📊 Tutti gli Stati</option>
+      <option value="In Regola">✅ In Regola</option>
+      <option value="In Scadenza">⚠️ In Scadenza</option>
+      <option value="Scaduto">🔴 Scaduto</option>
+      <option value="Sospeso">⏸️ Sospeso</option>
+    </select>
+    <select id="filterMetodo" onchange="renderList()">
+      <option value="">💳 Tutti i Metodi</option>
+      <option value="PayPal">PayPal</option>
+      <option value="Satispay">Satispay</option>
+      <option value="Bonifico Bancario">Bonifico Bancario</option>
+      <option value="Bonifico">Bonifico</option>
+      <option value="Carta">Carta</option>
+      <option value="Altro">Altro</option>
+    </select>
+    <select id="filterScadenza" onchange="renderList()">
+      <option value="">📅 Tutte le Scadenze</option>
+      <option value="scaduti">🔴 Scaduti</option>
+      <option value="7gg">⚠️ In scadenza (≤7 gg)</option>
+      <option value="3gg">🚨 Urgenti (≤3 gg)</option>
+      <option value="regola">✅ In regola (>7 gg)</option>
+    </select>
+    <select id="filterServizio" onchange="renderList()">
+      <option value="">🎬 Tutti i Servizi</option>
+      <option value="Netflix">Netflix</option>
+      <option value="Disney">Disney Plus</option>
+      <option value="Spotify">Spotify</option>
+      <option value="Tidal">Tidal</option>
+      <option value="SURFSHARK">SURFSHARK</option>
+      <option value="Crunchyroll">Crunchyroll</option>
+      <option value="Nord vpn">Nord VPN</option>
+    </select>
+    <button class="btn btn-sm btn-outline-dark" onclick="resetFilters()" style="border:1px solid #cbd5e1;color:#475569;background:white;">🔄 Reset</button>
+  </div>
+  <div class="results-count" id="resultsCount"></div>
+</div>
     <div style="overflow-x:auto;">
       <table>
         <thead>
@@ -307,13 +352,37 @@ function renderStats() {
 
 function renderList() {
   const search = document.getElementById('searchInput').value.toLowerCase();
+  const filterStato = document.getElementById('filterStato').value;
+  const filterMetodo = document.getElementById('filterMetodo').value;
+  const filterScadenza = document.getElementById('filterScadenza').value;
+  const filterServizio = document.getElementById('filterServizio').value;
   const tbody = document.getElementById('tableBody');
-  const filtered = records.filter(r => (r.payerName + r.servizio + r.contatto + r.note).toLowerCase().includes(search));
 
+  let filtered = records.filter(r => {
+    const textMatch = (r.payerName + r.servizio + r.contatto + r.note).toLowerCase().includes(search);
+    const statoMatch = !filterStato || r.stato === filterStato;
+    const metodoMatch = !filterMetodo || r.metodo === filterMetodo;
+    const servizioMatch = !filterServizio || r.servizio.toLowerCase().includes(filterServizio.toLowerCase());
+
+    let scadenzaMatch = true;
+    if (filterScadenza) {
+      const days = getDaysUntilDue(computeNextDueDate(r.ultimoPagamento));
+      if (filterScadenza === 'scaduti') scadenzaMatch = days < 0;
+      else if (filterScadenza === '7gg') scadenzaMatch = days >= 0 && days <= 7;
+      else if (filterScadenza === '3gg') scadenzaMatch = days >= 0 && days <= 3;
+      else if (filterScadenza === 'regola') scadenzaMatch = days > 7;
+    }
+
+    return textMatch && statoMatch && metodoMatch && scadenzaMatch && servizioMatch;
+  });
+
+  const countEl = document.getElementById('resultsCount');
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:#94a3b8;">Nessun risultato</td></tr>`;
+    if (countEl) countEl.textContent = '0 risultati';
     return;
   }
+  if (countEl) countEl.textContent = `Mostrati ${filtered.length} di ${records.length} record`;
 
   tbody.innerHTML = filtered.map(r => {
     const nextDue = computeNextDueDate(r.ultimoPagamento);
@@ -528,6 +597,15 @@ function showToast(msg) {
 document.getElementById('modalOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
 });
+
+function resetFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterStato').value = '';
+  document.getElementById('filterMetodo').value = '';
+  document.getElementById('filterScadenza').value = '';
+  document.getElementById('filterServizio').value = '';
+  renderList();
+}
 
 checkAuth();
 loadFromServer();

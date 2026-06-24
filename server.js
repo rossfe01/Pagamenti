@@ -8,8 +8,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'abbonamenti.json');
 
-// Nuova password impostata: Mangusta_2026!
-const ADMIN_HASH = '$2a$10$tZ2pWwI7t9bHmWd02.hLleCgWqgZsnv3oR.jYl1eRsh9aB9eWjD1G';
+// Nuova password impostata: Mangusta2026
+const ADMIN_HASH = '$2a$10$wKpbeBAs3NisTz7XvXh8/OUi61X3T5hRiz70t91/R3Ww/2qI/gEfe';
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));

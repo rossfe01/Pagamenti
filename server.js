@@ -6,13 +6,16 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'abbonamenti.json');
 
-// Ottimizzazione per la gestione dei proxy su Render
+// Ottimizzazione per la gestione del proxy su Render
 app.enable('trust proxy');
 
-// Middleware per ricevere i dati JSON
+// Middleware per ricevere i dati in formato JSON
 app.use(express.json({ limit: '10mb' }));
 
-// === ROTTE API APERTE (SENZA AUTENTICAZIONE) ===
+// Rende accessibili staticamente tutti i file nella root del progetto
+app.use(express.static(__dirname));
+
+// === ROTTE API PUBBLICHE (Senza alcun controllo requireAuth) ===
 app.get('/api/records', (req, res) => {
     try {
         if (!fs.existsSync(DATA_FILE)) {
@@ -34,7 +37,7 @@ app.post('/api/records', (req, res) => {
     }
 });
 
-// Mock delle rotte auth per evitare errori sul front-end se invocati residui
+// Mock delle rotte di autenticazione per evitare errori nel front-end
 app.get('/api/check-auth', (req, res) => {
     res.json({ authenticated: true });
 });
@@ -43,12 +46,21 @@ app.post('/api/logout', (req, res) => {
     res.json({ success: true });
 });
 
-// Health Check per Render
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', protected: false });
 });
 
-// === INIZIALIZZAZIONE DEL FILE DATA ===
+// === ROTTA PRINCIPALE (Invia direttamente app.html) ===
+app.get('/', (req, res) => {
+    const targetPath = path.join(__dirname, 'app.html');
+    if (fs.existsSync(targetPath)) {
+        res.sendFile(targetPath);
+    } else {
+        res.status(404).send('Errore: Il file app.html non è stato trovato nella root del progetto.');
+    }
+});
+
+// === INIZIALIZZAZIONE DEL DATASET ===
 if (!fs.existsSync(path.join(__dirname, 'data'))) {
     fs.mkdirSync(path.join(__dirname, 'data'));
 }
@@ -77,7 +89,7 @@ const defaultData = [
   {"payerName":"Daniele La Mantia","servizio":"Netflix Premium","quota":"5.00","metodo":"PayPal","ultimoPagamento":"2026-07-01","stato":"In Regola","contatto":"silver_shark1@libero.it - +39 327 124 7397","note":"","id":"rec_20"},
   {"payerName":"Alessio Bellezza","servizio":"Crunchyroll (fedebr2023@gmx.com)","quota":"2.50","metodo":"PayPal","ultimoPagamento":"2026-06-02","stato":"In Regola","contatto":"+39 389 882 9693 - a.bellezza92@gmail.com","note":"","id":"rec_21"},
   {"payerName":"Alessandro","servizio":"SURFSHARK (mangustavelox@gmail.com)","quota":"1.50","metodo":"Satispay","ultimoPagamento":"2026-06-01","stato":"In Regola","contatto":"+393293152838","note":"","id":"rec_22"},
-  {"payerName":"manuel gallo","servizio":"Netflix premium","quota":"5.00","metodo":"Bonifico","ultimoPagamento":"2026-06-12","stato":"In Regola","contatto":"3738346240","note":"","id":"rec_23"},
+  {"manuel gallo","servizio":"Netflix premium","quota":"5.00","metodo":"Bonifico","ultimoPagamento":"2026-06-12","stato":"In Regola","contatto":"3738346240","note":"","id":"rec_23"},
   {"payerName":"Raffaele Crispino","servizio":"Netflix Premium","quota":"5.00","metodo":"PayPal","ultimoPagamento":"2026-05-27","stato":"In Regola","contatto":"Raffo2626@gmail.com","note":"","id":"rec_24"},
   {"payerName":"Gianni F (Cosimo de Rosa)","servizio":"Netflix Premium","quota":"5.00","metodo":"PayPal","ultimoPagamento":"2026-06-24","stato":"In Regola","contatto":"+393927639250","note":"","id":"rec_25"},
   {"payerName":"Angelo Filomena","servizio":"SURFSHARK (mangustavelox@gmail.com)","quota":"1.50","metodo":"Bonifico","ultimoPagamento":"2026-06-09","stato":"In Regola","contatto":"+39 366 958 4558","note":"","id":"rec_26"},
@@ -93,14 +105,6 @@ if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, JSON.stringify(defaultData, null, 2));
 }
 
-// Instrada la root del sito direttamente sul file della dashboard principale
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'app.html'));
-});
-
-// Fornisce l'accesso statico a tutte le risorse correnti della cartella principale
-app.use(express.static(__dirname));
-
 app.listen(PORT, () => {
-    console.log(`🚀 Applicazione pubblica avviata sulla porta ${PORT}`);
+    console.log(`🚀 Server pubblico e rotte corrette sulla porta ${PORT}`);
 });

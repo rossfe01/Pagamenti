@@ -10,7 +10,7 @@ const DATA_FILE = path.join(__dirname, 'data', 'abbonamenti.json');
 
 // === CONFIGURAZIONE LOGIN ===
 // Cambia questa password! Genera l'hash con: node -e "console.log(require('bcryptjs').hashSync('tua-password', 10))"
-const ADMIN_HASH = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'; // hash di "password123"
+const ADMIN_HASH = '$2a$12$BiDXytz/2ZAwFYWQpejEDeB2e823jkVhADvj75iwcm2Q4ESsUdXYe/.og/at2.uheWG/igi'; // hash di ""
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));

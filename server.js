@@ -1,23 +1,95 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const session = require('express-session');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'abbonamenti.json');
 
-// Crea cartella data se non esiste
+// === CONFIGURAZIONE LOGIN ===
+// Cambia questa password! Genera l'hash con: node -e "console.log(require('bcryptjs').hashSync('tua-password', 10))"
+const ADMIN_HASH = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'; // hash di "password123"
+
+// Middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.static('public'));
+app.use(session({
+    secret: 'abbonamenti-secret-key-2024',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 ore
+}));
+
+// === MIDDLEWARE AUTH ===
+function requireAuth(req, res, next) {
+    if (req.session.authenticated) {
+        return next();
+    }
+    res.status(401).json({ error: 'Non autorizzato', loginRequired: true });
+}
+
+function checkAuth(req, res, next) {
+    if (req.session.authenticated) {
+        return next();
+    }
+    // Serve la pagina di login
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+}
+
+// === ROTTE AUTH ===
+app.post('/api/login', async (req, res) => {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Password richiesta' });
+    
+    const valid = await bcrypt.compare(password, ADMIN_HASH);
+    if (valid) {
+        req.session.authenticated = true;
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ error: 'Password errata' });
+    }
+});
+
+app.post('/api/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
+});
+
+app.get('/api/check-auth', (req, res) => {
+    res.json({ authenticated: !!req.session.authenticated });
+});
+
+// === ROTTE API (protette) ===
+app.get('/api/records', requireAuth, (req, res) => {
+    try {
+        const data = fs.readFileSync(DATA_FILE, 'utf8');
+        res.json(JSON.parse(data));
+    } catch (err) {
+        res.status(500).json({ error: 'Errore lettura dati' });
+    }
+});
+
+app.post('/api/records', requireAuth, (req, res) => {
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(req.body, null, 2));
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Errore salvataggio' });
+    }
+});
+
+// Health check (pubblico)
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', protected: true });
+});
+
+// === INIZIALIZZAZIONE ===
 if (!fs.existsSync(path.join(__dirname, 'data'))) {
     fs.mkdirSync(path.join(__dirname, 'data'));
 }
 
-// Middleware
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
-
-// Dati di default (i tuoi 33 record)
 const defaultData = [
   {"payerName":"Andrea Verghetti","servizio":"Disney Plus (casarox2023@gmail.com)","quota":"4.00","metodo":"Satispay","ultimoPagamento":"2026-06-12","stato":"In Regola","contatto":"+393298799008","note":"","id":"rec_0"},
   {"payerName":"Hamza","servizio":"SURFSHARK (mangustavelox@gmail.com)","quota":"1.50","metodo":"PayPal","ultimoPagamento":"2026-06-12","stato":"In Regola","contatto":"+33 7 66 75 26 70","note":"","id":"rec_1"},
@@ -54,36 +126,10 @@ const defaultData = [
   {"payerName":"Marco Ventimiglia","servizio":"Netflix PRemium","quota":"5.00","metodo":"PayPal","ultimoPagamento":"2026-10-22","stato":"In Regola","contatto":"Whatsapp +39 3513567270","note":"2° account Netflix","id":"rec_32"}
 ];
 
-// Inizializza file dati se non esiste
 if (!fs.existsSync(DATA_FILE)) {
     fs.writeFileSync(DATA_FILE, JSON.stringify(defaultData, null, 2));
 }
 
-// GET — Leggi tutti i record
-app.get('/api/records', (req, res) => {
-    try {
-        const data = fs.readFileSync(DATA_FILE, 'utf8');
-        res.json(JSON.parse(data));
-    } catch (err) {
-        res.status(500).json({ error: 'Errore lettura dati' });
-    }
-});
-
-// POST — Salva tutti i record
-app.post('/api/records', (req, res) => {
-    try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(req.body, null, 2));
-        res.json({ success: true, message: 'Dati salvati sul server' });
-    } catch (err) {
-        res.status(500).json({ error: 'Errore salvataggio' });
-    }
-});
-
-// Health check
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
 app.listen(PORT, () => {
-    console.log(`🚀 Server avviato sulla porta ${PORT}`);
+    console.log(`🔒 Server protetto avviato sulla porta ${PORT}`);
 });

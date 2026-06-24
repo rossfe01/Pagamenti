@@ -207,17 +207,12 @@ let records = [];
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 
-// Verifica autenticazione all'avvio
 async function checkAuth() {
   try {
     const res = await fetch(API_URL + '/api/check-auth');
     const data = await res.json();
-    if (!data.authenticated) {
-      window.location.href = '/';
-    }
-  } catch (err) {
-    window.location.href = '/';
-  }
+    if (!data.authenticated) window.location.href = '/';
+  } catch (err) { window.location.href = '/'; }
 }
 
 async function logout() {
@@ -234,7 +229,7 @@ async function loadFromServer() {
     renderList();
     showToast('✅ Dati caricati!');
   } catch (err) {
-    showToast('❌ Errore caricamento dati');
+    showToast('❌ Errore caricamento');
   }
 }
 
@@ -289,7 +284,7 @@ function renderStats() {
     const d = getDaysUntilDue(computeNextDueDate(r.ultimoPagamento));
     return d >= 0 && d <= 7;
   }).length;
-  
+
   document.getElementById('stats').innerHTML = `
     <div class="stat-card success">
       <div class="value">${total}</div>
@@ -314,12 +309,12 @@ function renderList() {
   const search = document.getElementById('searchInput').value.toLowerCase();
   const tbody = document.getElementById('tableBody');
   const filtered = records.filter(r => (r.payerName + r.servizio + r.contatto + r.note).toLowerCase().includes(search));
-  
+
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:40px;color:#94a3b8;">Nessun risultato</td></tr>`;
     return;
   }
-  
+
   tbody.innerHTML = filtered.map(r => {
     const nextDue = computeNextDueDate(r.ultimoPagamento);
     const days = getDaysUntilDue(nextDue);
@@ -328,7 +323,7 @@ function renderList() {
     const rowClass = days < 0 ? 'overdue' : (days <= 3 ? 'due-soon' : '');
     const methodColors = { 'PayPal': 'badge-blue', 'Satispay': 'badge-purple', 'Bonifico': 'badge-orange', 'Bonifico Bancario': 'badge-orange' };
     const methodBadge = methodColors[r.metodo] || 'badge-blue';
-    
+
     return `<tr class="${rowClass}">
       <td><strong>${r.payerName}</strong></td>
       <td>${r.servizio}</td>
@@ -357,18 +352,18 @@ function renderCalendar() {
   const startDay = firstDay.getDay();
   const monthNames = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
   const dayNames = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
-  
+
   document.getElementById('calMonthYear').textContent = monthNames[currentMonth] + ' ' + currentYear;
   let html = dayNames.map(d => `<div class="cal-header">${d}</div>`).join('');
-  
+
   const prevLastDay = new Date(currentYear, currentMonth, 0).getDate();
   for (let i = startDay - 1; i >= 0; i--) {
     html += `<div class="cal-day other-month"><div class="cal-day-number">${prevLastDay - i}</div></div>`;
   }
-  
+
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-  
+
   for (let day = 1; day <= daysInMonth; day++) {
     const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const isToday = dateStr === todayStr;
@@ -379,12 +374,12 @@ function renderCalendar() {
       if (daysUntil < 0) color = '#ef4444';
       else if (daysUntil <= 3) color = '#f59e0b';
       else if (daysUntil <= 7) color = '#f97316';
-      return `<div class="cal-event" style="background:${color};color:white;" onclick="editRecord('${r.id}')" title="${r.payerName} - ${r.quota}€">${r.payerName.split(' ')[0]} ${r.quota}€</div>`;
+      return `<div class="cal-event" style="background:${color};color:white;" onclick="editRecord('${r.id}')" title="${r.payerName} - ${r.servizio} (${r.quota}€)">${r.payerName.split(' ')[0]} ${r.quota}€</div>`;
     }).join('');
-    
+
     html += `<div class="cal-day ${isToday ? 'today' : ''}"><div class="cal-day-number">${day}</div>${eventsHtml}</div>`;
   }
-  
+
   const totalCells = startDay + daysInMonth;
   const remaining = 7 - (totalCells % 7);
   if (remaining < 7) {
@@ -392,7 +387,7 @@ function renderCalendar() {
       html += `<div class="cal-day other-month"><div class="cal-day-number">${i}</div></div>`;
     }
   }
-  
+
   document.getElementById('calendarGrid').innerHTML = html;
 }
 
@@ -451,7 +446,7 @@ async function saveRecord(e) {
     contatto: document.getElementById('contatto').value,
     note: document.getElementById('note').value
   };
-  
+
   if (id) {
     const idx = records.findIndex(r => r.id === id);
     records[idx] = data;
@@ -460,7 +455,7 @@ async function saveRecord(e) {
     records.push(data);
     showToast('➕ Aggiunto!');
   }
-  
+
   await saveToServer();
   closeModal();
   renderStats();
@@ -472,7 +467,7 @@ function editRecord(id) {
 }
 
 async function deleteRecord(id) {
-  if (!confirm('Eliminare questo record?')) return;
+  if (!confirm('Eliminare?')) return;
   records = records.filter(r => r.id !== id);
   await saveToServer();
   renderStats();
@@ -516,9 +511,7 @@ function importJSON() {
         renderStats();
         renderList();
         showToast('📥 Importato!');
-      } catch(err) {
-        alert('Errore JSON');
-      }
+      } catch(err) { alert('Errore JSON'); }
     };
     reader.readAsText(file);
   };
@@ -536,7 +529,6 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
   if (e.target === document.getElementById('modalOverlay')) closeModal();
 });
 
-// Avvio protetto
 checkAuth();
 loadFromServer();
 </script>

@@ -8,8 +8,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'abbonamenti.json');
 
-// Nuova password impostata: Mangusta2026
-const ADMIN_HASH = '$2a$10$wKpbeBAs3NisTz7XvXh8/OUi61X3T5hRiz70t91/R3Ww/2qI/gEfe';
+// === CONFIGURAZIONE LOGIN ===
+// Password di default: password123
+// Per cambiarla, esegui: node -e "console.log(require('bcryptjs').hashSync('TUA-PASSWORD', 10))"
+const ADMIN_HASH = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -20,36 +22,17 @@ app.use(session({
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
-// Auth middleware
+// === MIDDLEWARE AUTH ===
 function requireAuth(req, res, next) {
     if (req.session.authenticated) return next();
-    res.status(401).json({ error: 'Non autorizzato' });
+    res.status(401).json({ error: 'Non autorizzato', loginRequired: true });
 }
 
-// === ROUTE PAGINE ===
-
-// Login page - PUBLIC
-app.get('/', (req, res) => {
-    const filePath = path.resolve(__dirname, 'public', 'login.html');
-    console.log('Serving login from:', filePath);
-    res.sendFile(filePath);
-});
-
-// App page - PROTECTED
-app.get('/app', (req, res) => {
-    if (!req.session.authenticated) {
-        return res.redirect('/');
-    }
-    const filePath = path.resolve(__dirname, 'public', 'app.html');
-    res.sendFile(filePath);
-});
-
-// === API ROUTES ===
-
+// === ROTTE AUTH ===
 app.post('/api/login', async (req, res) => {
     const { password } = req.body;
     if (!password) return res.status(400).json({ error: 'Password richiesta' });
-    
+
     const valid = await bcrypt.compare(password, ADMIN_HASH);
     if (valid) {
         req.session.authenticated = true;
@@ -68,6 +51,7 @@ app.get('/api/check-auth', (req, res) => {
     res.json({ authenticated: !!req.session.authenticated });
 });
 
+// === ROTTE API (protette) ===
 app.get('/api/records', requireAuth, (req, res) => {
     try {
         const data = fs.readFileSync(DATA_FILE, 'utf8');
@@ -86,10 +70,16 @@ app.post('/api/records', requireAuth, (req, res) => {
     }
 });
 
-// === STATIC FILES ===
-app.use(express.static(path.join(__dirname, 'public')));
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', protected: true });
+});
 
-// === DATA INITIALIZATION ===
+// === INIZIALIZZAZIONE ===
+if (!fs.existsSync(path.join(__dirname, 'data'))) {
+    fs.mkdirSync(path.join(__dirname, 'data'));
+}
+
 const defaultData = [
   {"payerName":"Andrea Verghetti","servizio":"Disney Plus (casarox2023@gmail.com)","quota":"4.00","metodo":"Satispay","ultimoPagamento":"2026-06-12","stato":"In Regola","contatto":"+393298799008","note":"","id":"rec_0"},
   {"payerName":"Hamza","servizio":"SURFSHARK (mangustavelox@gmail.com)","quota":"1.50","metodo":"PayPal","ultimoPagamento":"2026-06-12","stato":"In Regola","contatto":"+33 7 66 75 26 70","note":"","id":"rec_1"},
@@ -126,21 +116,26 @@ const defaultData = [
   {"payerName":"Marco Ventimiglia","servizio":"Netflix PRemium","quota":"5.00","metodo":"PayPal","ultimoPagamento":"2026-10-22","stato":"In Regola","contatto":"Whatsapp +39 3513567270","note":"2° account Netflix","id":"rec_32"}
 ];
 
-// Inizializzazione protetta del file system locale
-try {
-    const dataDir = path.dirname(DATA_FILE);
-    if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-    }
-    if (!fs.existsSync(DATA_FILE)) {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(defaultData, null, 2));
-    }
-} catch (err) {
-    console.error("⚠️ Attenzione: Impossibile creare o scrivere il file locale iniziale:", err.message);
+if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(defaultData, null, 2));
 }
 
-// === AVVIO SERVER ===
+// Servi il login come pagina principale
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// Servi l'app protetta
+app.get('/app.html', (req, res) => {
+    if (!req.session.authenticated) {
+        return res.redirect('/');
+    }
+    res.sendFile(path.join(__dirname, 'public', 'app.html'));
+});
+
+// Static files (login.html è pubblico, app.html è protetta via route sopra)
+app.use(express.static('public'));
+
 app.listen(PORT, () => {
     console.log(`🔒 Server protetto avviato sulla porta ${PORT}`);
-    console.log(`📁 Database locale configurato in: ${DATA_FILE}`);
 });

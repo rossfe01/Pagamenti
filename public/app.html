@@ -4,13 +4,12 @@ let records = [];
 let currentMonth = new Date().getMonth();
 let currentYear = new Date().getFullYear();
 
-// Avvio dell'applicazione senza blocchi o controlli di sessione
+// Avvio diretto senza chiamate bloccanti a finestre di login
 async function init() {
   await loadFromServer();
 }
 
 async function checkAuth() {
-  // Funzione bypassata per rimuovere la richiesta di login
   console.log("Controllo autenticazione rimosso.");
 }
 
@@ -21,12 +20,7 @@ async function logout() {
 async function loadFromServer() {
   try {
     const res = await fetch(API_URL + '/api/records');
-    if (!res.ok) {
-      if (res.status === 401) {
-        console.warn("Rilevato codice 401 residuo. Ignorato in modalità pubblica.");
-      }
-      throw new Error('HTTP status ' + res.status);
-    }
+    if (!res.ok) throw new Error('HTTP status ' + res.status);
     records = await res.json();
     renderStats();
     renderList();
@@ -37,5 +31,6 @@ async function loadFromServer() {
   }
 }
 
-// Esegui l'inizializzazione non appena il DOM è pronto
+// Inizializza non appena il DOM è pronto
 document.addEventListener('DOMContentLoaded', init);
+</script>

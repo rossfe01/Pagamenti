@@ -9,36 +9,40 @@ const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'abbonamenti.json');
 
 // === CONFIGURAZIONE LOGIN ===
-// Cambia questa password! Genera l'hash con: node -e "console.log(require('bcryptjs').hashSync('tua-password', 10))"
-const ADMIN_HASH = '$2a$12$BiDXytz/2ZAwFYWQpejEDeB2e823jkVhADvj75iwcm2Q4ESsUdXYe/.og/at2.uheWG/igi'; // hash di ""
+// Password di default: password123
+const ADMIN_HASH = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
 app.use(session({
     secret: 'abbonamenti-secret-key-2024',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 } // 24 ore
+    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 }
 }));
 
 // === MIDDLEWARE AUTH ===
 function requireAuth(req, res, next) {
-    if (req.session.authenticated) {
-        return next();
-    }
+    if (req.session.authenticated) return next();
     res.status(401).json({ error: 'Non autorizzato', loginRequired: true });
 }
 
-function checkAuth(req, res, next) {
-    if (req.session.authenticated) {
-        return next();
-    }
-    // Serve la pagina di login
-    res.sendFile(path.join(__dirname, 'public', 'login.html'));
-}
+// === ROTTE PAGINE (prima di express.static!) ===
 
-// === ROTTE AUTH ===
+// Pagina login - accessibile a tutti
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+// App protetta - richiede login
+app.get('/app.html', (req, res) => {
+    if (!req.session.authenticated) {
+        return res.redirect('/');
+    }
+    res.sendFile(path.join(__dirname, 'public', 'app.html'));
+});
+
+// === ROTTE API ===
 app.post('/api/login', async (req, res) => {
     const { password } = req.body;
     if (!password) return res.status(400).json({ error: 'Password richiesta' });
@@ -61,7 +65,6 @@ app.get('/api/check-auth', (req, res) => {
     res.json({ authenticated: !!req.session.authenticated });
 });
 
-// === ROTTE API (protette) ===
 app.get('/api/records', requireAuth, (req, res) => {
     try {
         const data = fs.readFileSync(DATA_FILE, 'utf8');
@@ -80,12 +83,15 @@ app.post('/api/records', requireAuth, (req, res) => {
     }
 });
 
-// Health check (pubblico)
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', protected: true });
 });
 
-// === INIZIALIZZAZIONE ===
+// === STATIC FILES (DOPO le route!) ===
+// Serve solo i file che non hanno route dedicate
+app.use(express.static('public'));
+
+// === INIZIALIZZAZIONE DATI ===
 if (!fs.existsSync(path.join(__dirname, 'data'))) {
     fs.mkdirSync(path.join(__dirname, 'data'));
 }
